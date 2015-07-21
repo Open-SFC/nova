@@ -1,0 +1,85 @@
+diff -Nur nova.ori/virt/libvirt/config.py nova/virt/libvirt/config.py
+--- nova.ori/virt/libvirt/config.py	2015-07-18 17:23:23.227743000 +0530
++++ nova/virt/libvirt/config.py	2015-07-18 17:24:24.459743000 +0530
+@@ -1501,6 +1501,41 @@
+ 
+         return dev
+ 
++#########NovaPatchStart
++class LibvirtConfigGuestSerialController(LibvirtConfigGuestDevice):
++
++    def __init__(self, **kwargs):
++        super(LibvirtConfigGuestSerialController, self).__init__(root_name="controller",
++                                                         **kwargs)
++
++        self.type = "virtio-serial"
++        self.index = "0"
++
++    def format_dom(self):
++        dev = super(LibvirtConfigGuestSerialController, self).format_dom()
++
++        dev.set("type", self.type)
++        dev.set("index", self.index)
++        return dev
++
++class LibvirtConfigGuestSerialChannel(LibvirtConfigGuestDevice):
++
++    def __init__(self, **kwargs):
++        super(LibvirtConfigGuestSerialChannel, self).__init__(root_name="channel",
++                                                         **kwargs)
++
++        self.type = "mount"
++
++    def format_dom(self):
++        dev = super(LibvirtConfigGuestSerialChannel, self).format_dom()
++
++        dev.set("type", self.type)
++        dev.append(etree.Element("source", path=self.source_path, mode=self.source_mode ))
++        dev.append(etree.Element("target", name=self.target_name, type=self.target_type ))
++
++        return dev
++###NovaPatchEnd
++
+ 
+ class LibvirtConfigGuestWatchdog(LibvirtConfigGuestDevice):
+     def __init__(self, **kwargs):
+diff -Nur nova.ori/virt/libvirt/driver.py nova/virt/libvirt/driver.py
+--- nova.ori/virt/libvirt/driver.py	2015-07-18 17:23:23.215743000 +0530
++++ nova/virt/libvirt/driver.py	2015-07-18 17:24:24.435743000 +0530
+@@ -2682,7 +2682,12 @@
+ 
+         # ensure directories exist and are writable
+         fileutils.ensure_tree(libvirt_utils.get_instance_path(instance))
+-
++	
++	#####NovaPatchStart
++        libvirt_utils.chown(libvirt_utils.get_instance_path(instance), 'root')
++        utils.execute('chmod', '777', libvirt_utils.get_instance_path(instance), run_as_root=True)
++        ####NovaPatchEnd
++	
+         LOG.info(_LI('Creating image'), instance=instance)
+ 
+         # NOTE(dprince): for rescue console.log may already exist... chown it.
+@@ -4147,6 +4152,22 @@
+             balloon.period = CONF.libvirt.mem_stats_period_seconds
+             guest.add_device(balloon)
+ 
++	###########NovaPatchStart
++        controller = vconfig.LibvirtConfigGuestSerialController()
++        guest.add_device(controller)
++        ##For channel
++        channel = vconfig.LibvirtConfigGuestSerialChannel()
++        channel.type = "unix"
++        channel.source_mode = "bind"
++        instance_dir = libvirt_utils.get_instance_path(instance)
++        channel.source_path = os.path.join(instance_dir,
++                                              "port")
++        channel.target_type = "virtio"
++        channel.target_name = "ns_port"
++        guest.add_device(channel)
++        ##########NovaPatchEnd
++
++
+         return guest
+ 
+     def _get_guest_xml(self, context, instance, network_info, disk_info,
