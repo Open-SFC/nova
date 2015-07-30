@@ -21,7 +21,7 @@ fsl_sriov_opts = [
             cfg.StrOpt('product_id',default='10ca'),
             cfg.StrOpt('physical_network',default='physnet1'),
             cfg.StrOpt('host', default='sriov-node'),
-            cfg.StrOpt('pci_devices', default='/etc/nova/fsl_sriov/pci_devices')
+            cfg.StrOpt('pci_devices', default='/etc/nova/pci_devices')
             ]
 
 CONF = cfg.CONF
